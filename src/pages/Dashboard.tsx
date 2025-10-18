@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Plan, DailyRecord, RewardTask } from '../types'
@@ -46,32 +46,7 @@ export default function Dashboard({ activePlan }: DashboardProps) {
     localStorage.setItem(STORAGE_KEY_DASHBOARD_VIEW, progressViewMode)
   }, [progressViewMode])
 
-  const loadData = async () => {
-    if (!activePlan) return
-
-    // 加载最近记录（5条）
-    const records = await window.electronAPI.getDailyRecords(activePlan.id, 5)
-    setRecentRecords(records)
-
-    // 加载昨日记录
-    const yesterday = getYesterdayDate()
-    const yesterdayRec = await window.electronAPI.getDailyRecordByDate(activePlan.id, yesterday)
-    setYesterdayRecord(yesterdayRec)
-
-    // 加载今日记录
-    const today = getTodayDate()
-    const todayRec = await window.electronAPI.getDailyRecordByDate(activePlan.id, today)
-    setTodayRecord(todayRec)
-
-    // 加载所有任务
-    const tasks = await window.electronAPI.getRewardTasks(activePlan.id)
-    setAllTasks(tasks)
-
-    // 统计需要确认的天数
-    await calculateUnconfirmedDays()
-  }
-
-  const calculateUnconfirmedDays = async () => {
+  const calculateUnconfirmedDays = useCallback(async () => {
     if (!activePlan) return
 
     const planCreatedDate = new Date(activePlan.created_at.split(' ')[0])
@@ -110,33 +85,68 @@ export default function Dashboard({ activePlan }: DashboardProps) {
     }
 
     setUnconfirmedDaysCount(count)
-  }
+  }, [activePlan])
 
-  const loadHeatmapData = async () => {
+  const loadData = useCallback(async () => {
     if (!activePlan) return
 
-    // 计算过去N天的日期范围
-    const endDate = getTodayDate()
-    const startDateStr = addDays(-DEFAULT_HEATMAP_DAYS)
+    try {
+      const yesterday = getYesterdayDate()
+      const today = getTodayDate()
 
-    // 加载数据
-    const records = await window.electronAPI.getRecordsByDateRange(
-      activePlan.id,
-      startDateStr,
-      endDate
-    )
-    setHeatmapRecords(records)
-  }
+      // 并行加载所有数据以提高性能
+      const [records, yesterdayRec, todayRec, tasks] = await Promise.all([
+        window.electronAPI.getDailyRecords(activePlan.id, 5),
+        window.electronAPI.getDailyRecordByDate(activePlan.id, yesterday),
+        window.electronAPI.getDailyRecordByDate(activePlan.id, today),
+        window.electronAPI.getRewardTasks(activePlan.id)
+      ])
 
-  const handleQuickCompleteTask = async (e: React.MouseEvent, taskId: number) => {
+      setRecentRecords(records)
+      setYesterdayRecord(yesterdayRec)
+      setTodayRecord(todayRec)
+      setAllTasks(tasks)
+
+      // 统计需要确认的天数（依赖于数据库查询，单独执行）
+      await calculateUnconfirmedDays()
+    } catch (error) {
+      console.error('加载仪表盘数据失败:', error)
+    }
+  }, [activePlan, calculateUnconfirmedDays])
+
+  const loadHeatmapData = useCallback(async () => {
+    if (!activePlan) return
+
+    try {
+      // 计算过去N天的日期范围
+      const endDate = getTodayDate()
+      const startDateStr = addDays(-DEFAULT_HEATMAP_DAYS)
+
+      // 加载数据
+      const records = await window.electronAPI.getRecordsByDateRange(
+        activePlan.id,
+        startDateStr,
+        endDate
+      )
+      setHeatmapRecords(records)
+    } catch (error) {
+      console.error('加载热力图数据失败:', error)
+    }
+  }, [activePlan])
+
+  const handleQuickCompleteTask = useCallback(async (e: React.MouseEvent, taskId: number) => {
     e.stopPropagation() // 阻止事件冒泡，防止触发导航
     
-    const today = getTodayDate()
-    await window.electronAPI.completeRewardTask(taskId, today)
-    
-    // 刷新数据
-    loadData()
-  }
+    try {
+      const today = getTodayDate()
+      await window.electronAPI.completeRewardTask(taskId, today)
+      
+      // 刷新数据
+      loadData()
+    } catch (error) {
+      console.error('完成任务失败:', error)
+    }
+  }, [loadData])
 
   if (!activePlan) {
     return (
@@ -156,20 +166,40 @@ export default function Dashboard({ activePlan }: DashboardProps) {
     )
   }
 
-  const progress = ((activePlan.initial_hours - activePlan.current_hours) / activePlan.initial_hours) * 100
-  const totalSpent = activePlan.initial_hours - activePlan.current_hours
+  // 使用 useMemo 缓存计算结果
+  const progress = useMemo(
+    () => ((activePlan.initial_hours - activePlan.current_hours) / activePlan.initial_hours) * 100,
+    [activePlan.initial_hours, activePlan.current_hours]
+  )
+  
+  const totalSpent = useMemo(
+    () => activePlan.initial_hours - activePlan.current_hours,
+    [activePlan.initial_hours, activePlan.current_hours]
+  )
 
   // 今日总激励时间
-  const todayTotalReward = todayRecord?.completed_tasks?.reduce((sum, t) => sum + t.reward_hours, 0) || 0
+  const todayTotalReward = useMemo(
+    () => todayRecord?.completed_tasks?.reduce((sum, t) => sum + t.reward_hours, 0) || 0,
+    [todayRecord?.completed_tasks]
+  )
 
   // 今日已完成任务列表
-  const todayCompletedTasks = todayRecord?.completed_tasks || []
+  const todayCompletedTasks = useMemo(
+    () => todayRecord?.completed_tasks || [],
+    [todayRecord?.completed_tasks]
+  )
 
   // 今日已完成任务的ID集合
-  const todayCompletedTaskIds = new Set(todayCompletedTasks.map(t => t.reward_task_id))
+  const todayCompletedTaskIds = useMemo(
+    () => new Set(todayCompletedTasks.map(t => t.reward_task_id)),
+    [todayCompletedTasks]
+  )
 
   // 未完成任务列表（任务池中排除今日已完成的）
-  const availableTasks = allTasks.filter(task => !todayCompletedTaskIds.has(task.id))
+  const availableTasks = useMemo(
+    () => allTasks.filter(task => !todayCompletedTaskIds.has(task.id)),
+    [allTasks, todayCompletedTaskIds]
+  )
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
