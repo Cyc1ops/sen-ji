@@ -14,6 +14,7 @@ export default function Settings({ onPlanChange }: SettingsProps) {
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null)
   const [editInitialHours, setEditInitialHours] = useState('')
   const [editCreatedAt, setEditCreatedAt] = useState('')
+  const [editDeadline, setEditDeadline] = useState('')
   const [showOtherPlans, setShowOtherPlans] = useState(false)
   const [showArchivedPlans, setShowArchivedPlans] = useState(false)
   const [archivingPlan, setArchivingPlan] = useState<Plan | null>(null)
@@ -48,6 +49,8 @@ export default function Settings({ onPlanChange }: SettingsProps) {
     if (!editingPlan) return
     const hours = parseHours(editInitialHours)
     await window.electronAPI.updatePlanDetails(editingPlan.id, hours, editCreatedAt)
+    // 同时更新 deadline
+    await window.electronAPI.updatePlan(editingPlan.id, { deadline: editDeadline || null })
     setEditingPlan(null)
     loadPlans()
     onPlanChange()
@@ -171,6 +174,7 @@ export default function Settings({ onPlanChange }: SettingsProps) {
                         setEditingPlan(activePlan)
                         setEditInitialHours(formatHours(activePlan.initial_hours))
                         setEditCreatedAt(activePlan.created_at.split(' ')[0])
+                        setEditDeadline(activePlan.deadline || '')
                       }}
                       className="px-4 py-2 bg-white bg-opacity-20 backdrop-blur-sm text-white rounded-lg hover:bg-opacity-30 transition-all"
                     >
@@ -556,6 +560,31 @@ export default function Settings({ onPlanChange }: SettingsProps) {
         </div>
       </section>
 
+      {/* 开发工具 */}
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">开发工具</h2>
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <p className="text-gray-600 mb-4">
+            创建测试计划用于测试和演示
+          </p>
+          <button
+            onClick={async () => {
+              try {
+                const testPlan = await window.electronAPI.createTestData()
+                alert(`✅ 测试数据创建成功！\n\n计划名称：${testPlan.name}\n初始时间：${testPlan.initial_hours} 小时\n截止日期：${testPlan.deadline}\n\n包含：\n• 5个测试任务\n• 30天历史记录\n\n请刷新页面查看`)
+                loadPlans()
+              } catch (error: any) {
+                alert('❌ 创建测试数据失败：' + error.message)
+              }
+            }}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+          >
+            <span>🧪</span>
+            创建测试计划
+          </button>
+        </div>
+      </section>
+
       {/* 数据导出 */}
       <section className="mb-8">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">数据导出</h2>
@@ -705,6 +734,22 @@ export default function Settings({ onPlanChange }: SettingsProps) {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  挑战截止日期
+                  <span className="text-xs text-gray-500 font-normal">（可选）</span>
+                </label>
+                <input
+                  type="date"
+                  value={editDeadline}
+                  onChange={(e) => setEditDeadline(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p className="text-sm text-gray-500 mt-2 flex items-center gap-1.5">
+                  <span className="text-purple-600">🐰</span>
+                  设置后将启用配速员功能，帮助你按进度完成挑战
+                </p>
+              </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button
@@ -739,6 +784,7 @@ interface CreatePlanDialogProps {
 function CreatePlanDialog({ onClose, onSuccess }: CreatePlanDialogProps) {
   const [name, setName] = useState('')
   const [initialTime, setInitialTime] = useState('1000:00')
+  const [deadline, setDeadline] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -749,7 +795,7 @@ function CreatePlanDialog({ onClose, onSuccess }: CreatePlanDialogProps) {
       return
     }
 
-    await window.electronAPI.createPlan(name, initialHours)
+    await window.electronAPI.createPlan(name, initialHours, deadline || null)
     onSuccess()
   }
 
@@ -773,7 +819,7 @@ function CreatePlanDialog({ onClose, onSuccess }: CreatePlanDialogProps) {
             />
           </div>
 
-          <div className="mb-6">
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-3">
               初始时间
             </label>
@@ -784,6 +830,23 @@ function CreatePlanDialog({ onClose, onSuccess }: CreatePlanDialogProps) {
             />
             <p className="text-sm text-gray-500 mt-3">
               设置计划的初始时间，例如 1000 小时
+            </p>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+              挑战截止日期
+              <span className="text-xs text-gray-500 font-normal">（可选）</span>
+            </label>
+            <input
+              type="date"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-sm text-gray-500 mt-2 flex items-center gap-1.5">
+              <span className="text-purple-600">🐰</span>
+              设置后将启用配速员功能，帮助你按进度完成挑战
             </p>
           </div>
 

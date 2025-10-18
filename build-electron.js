@@ -11,7 +11,9 @@ async function build() {
     target: 'node18',
     outfile: 'dist-electron/main.js',
     external: ['electron', 'better-sqlite3'],
-    format: 'cjs'
+    format: 'cjs',
+    mainFields: ['main', 'module'],
+    conditions: ['node']
   })
 
   // 构建预加载脚本

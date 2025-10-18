@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
-import path from 'path'
-import Database from 'better-sqlite3'
+const electron = require('electron')
+const { app, BrowserWindow, ipcMain } = electron
+const path = require('path')
+const Database = require('better-sqlite3')
 import { 
   initDatabase, 
   getAllPlans, 
@@ -26,7 +27,8 @@ import {
   exportToMarkdown,
   exportToJSON,
   getDailyRecordByDate,
-  recalculateAllRecords
+  recalculateAllRecords,
+  createTestData
 } from './database'
 
 // __dirname is available in CommonJS, no need to derive it
@@ -93,8 +95,8 @@ function registerIpcHandlers() {
   // 计划管理
   ipcMain.handle('get-all-plans', () => getAllPlans(db!))
   ipcMain.handle('get-active-plan', () => getActivePlan(db!))
-  ipcMain.handle('create-plan', (_, name: string, initialHours: number) => 
-    createPlan(db!, name, initialHours))
+  ipcMain.handle('create-plan', (_, name: string, initialHours: number, deadline?: string | null) => 
+    createPlan(db!, name, initialHours, deadline))
   ipcMain.handle('update-plan', (_, id: number, updates: any) => 
     updatePlan(db!, id, updates))
   ipcMain.handle('set-active-plan', (_, id: number) => 
@@ -110,6 +112,10 @@ function registerIpcHandlers() {
   ipcMain.handle('recalculate-all-records', (_, planId: number) => {
     recalculateAllRecords(db!, planId)
   })
+
+  // 创建测试数据
+  ipcMain.handle('create-test-data', () =>
+    createTestData(db!))
 
   // 奖励任务
   ipcMain.handle('get-reward-tasks', (_, planId: number) => 

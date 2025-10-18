@@ -5,6 +5,7 @@ export interface Plan {
   current_hours: number
   status: 'active' | 'archived'
   archive_reason?: 'completed' | 'suspended'  // 归档原因：已完成 或 已搁置
+  deadline?: string | null  // 挑战截止日期 YYYY-MM-DD
   created_at: string
   archived_at: string | null
 }
@@ -42,7 +43,7 @@ export interface ElectronAPI {
   // 计划管理
   getAllPlans: () => Promise<Plan[]>
   getActivePlan: () => Promise<Plan | null>
-  createPlan: (name: string, initialHours: number) => Promise<Plan>
+  createPlan: (name: string, initialHours: number, deadline?: string | null) => Promise<Plan>
   updatePlan: (id: number, updates: Partial<Plan>) => Promise<Plan>
   setActivePlan: (id: number) => Promise<Plan>
   archivePlan: (id: number, reason: 'completed' | 'suspended') => Promise<Plan>
@@ -50,6 +51,9 @@ export interface ElectronAPI {
   deletePlan: (id: number) => Promise<void>
   updatePlanDetails: (id: number, initialHours: number, createdAt: string) => Promise<Plan>
   recalculateAllRecords: (planId: number) => Promise<void>
+  
+  // 测试数据
+  createTestData: () => Promise<Plan>
 
   // 奖励任务
   getRewardTasks: (planId: number) => Promise<RewardTask[]>

@@ -173,17 +173,27 @@ export default function Dashboard({ activePlan }: DashboardProps) {
       <h1 className="text-3xl font-bold text-gray-900 mb-8">仪表盘</h1>
 
       {/* 进度卡片 */}
-      <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-        {/* 切换按钮 */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">{activePlan.name}</h2>
+      <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+        {/* 标题栏 */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">{activePlan.name}</h2>
+              <p className="text-xs text-gray-500 mt-0.5">初始 {formatHours(activePlan.initial_hours)}</p>
+            </div>
+          </div>
           <button
             onClick={() => {
               const newMode = progressViewMode === 'stats' ? 'heatmap' : 'stats'
               console.log('Switching view mode to:', newMode, 'heatmapRecords count:', heatmapRecords.length)
               setProgressViewMode(newMode)
             }}
-            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 text-gray-600 hover:bg-white hover:shadow-sm rounded-lg transition-all"
             title={progressViewMode === 'stats' ? '切换到热力图' : '切换到统计视图'}
           >
             {progressViewMode === 'stats' ? (
@@ -201,30 +211,343 @@ export default function Dashboard({ activePlan }: DashboardProps) {
         {/* 统计视图 */}
         {progressViewMode === 'stats' && (
           <>
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-gray-600">
-                初始时间: {formatHours(activePlan.initial_hours)}
-              </p>
+            {/* 核心数据展示 */}
+            <div className="flex items-end justify-between mb-6">
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm text-gray-500">已完成</span>
+                <span className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  {progress.toFixed(1)}%
+                </span>
+              </div>
               <div className="text-right">
+                <div className="text-xs text-gray-500 mb-1">剩余时间</div>
                 <div className="text-3xl font-bold text-blue-600">
                   {formatHours(activePlan.current_hours)}
                 </div>
-                <div className="text-sm text-gray-600 mt-1">剩余时间</div>
               </div>
             </div>
 
-            {/* 进度条 */}
-            <div className="mt-6">
-              <div className="flex justify-between text-sm text-gray-600 mb-2">
-                <span>已完成 {progress.toFixed(1)}%</span>
+            {/* 进度条区域 */}
+            <div>
+              <div className="flex justify-between text-xs text-gray-500 mb-2">
                 <span>已投入 {formatHours(totalSpent)}</span>
+                <span>{formatHours(activePlan.initial_hours)}</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
+              <div className="relative w-full bg-gradient-to-r from-gray-100 to-gray-200 rounded-full h-3 mb-6 shadow-inner">
+                {/* 实际进度条 */}
                 <div
-                  className="bg-blue-600 h-3 rounded-full transition-all duration-500"
+                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-500 shadow-sm"
                   style={{ width: `${Math.min(progress, 100)}%` }}
                 />
+                
+                {/* 配速员标记 */}
+                {activePlan.deadline && (() => {
+                  const today = new Date()
+                  today.setHours(0, 0, 0, 0)
+                  const planStartDate = new Date(activePlan.created_at.split(' ')[0])
+                  planStartDate.setHours(0, 0, 0, 0)
+                  const deadlineDate = new Date(activePlan.deadline)
+                  deadlineDate.setHours(0, 0, 0, 0)
+                  
+                  // 如果还没到截止日期
+                  if (today <= deadlineDate) {
+                    const totalDays = Math.ceil((deadlineDate.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24))
+                    const elapsedDays = Math.ceil((today.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24))
+                    const remainingDays = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                    const paceProgress = Math.min((elapsedDays / totalDays) * 100, 100)
+                    
+                    // 计算是落后还是领先
+                    const paceExpectedHours = activePlan.initial_hours * (elapsedDays / totalDays)
+                    const actualSpentHours = totalSpent
+                    const gapHours = actualSpentHours - paceExpectedHours
+                    const isBehind = gapHours < 0
+                    
+                    // 根据状态设置颜色
+                    const lineColor = isBehind ? 'bg-orange-500' : 'bg-green-500'
+                    const shadowColor = isBehind ? 'shadow-orange-300' : 'shadow-green-300'
+                    const hoverBgColor = isBehind ? 'hover:bg-orange-600' : 'hover:bg-green-600'
+                    const textColor = isBehind ? 'text-orange-600' : 'text-green-600'
+                    const borderColor = isBehind ? 'border-orange-200' : 'border-green-200'
+                    const bgColor = isBehind ? 'bg-orange-50' : 'bg-green-50'
+                    
+                    return (
+                      <div 
+                        className="absolute flex flex-col items-center group"
+                        style={{ 
+                          left: `${paceProgress}%`, 
+                          transform: 'translateX(-50%)',
+                          top: '-2px',
+                          bottom: '-2px'
+                        }}
+                      >
+                        {/* 配速竖线 - 圆角 + hover动效 */}
+                        <div 
+                          className={`w-1 ${lineColor} ${shadowColor} ${hoverBgColor} shadow-lg rounded-full transition-all duration-500 cursor-pointer group-hover:w-1.5 group-hover:shadow-xl`}
+                          style={{ height: 'calc(100% + 4px)' }}
+                        />
+                        
+                        {/* 悬浮预览卡片 - 更小更简洁 */}
+                        <div 
+                          className={`absolute opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50`}
+                          style={{
+                            top: '-95px',
+                            left: paceProgress > 70 ? 'auto' : '25px',
+                            right: paceProgress > 70 ? '25px' : 'auto',
+                            minWidth: '160px'
+                          }}
+                        >
+                          <div className={`${bgColor} border ${borderColor} rounded-lg shadow-lg p-2`}>
+                            {/* 标题行 */}
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <div className={`w-5 h-5 bg-gradient-to-br ${isBehind ? 'from-orange-400 to-red-500' : 'from-green-400 to-emerald-500'} rounded flex items-center justify-center`}>
+                                <span className="text-xs">🐰</span>
+                              </div>
+                              <span className={`text-xs font-bold ${textColor}`}>配速员</span>
+                            </div>
+                            
+                            {/* 核心数据 - 更紧凑 */}
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-500">进度</span>
+                                <span className={`font-bold ${textColor}`}>{paceProgress.toFixed(1)}%</span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-500">时间</span>
+                                <span className="font-medium text-gray-700">{elapsedDays}/{totalDays}天</span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-500">状态</span>
+                                <span className={`font-bold ${textColor} text-xs`}>
+                                  {isBehind ? `落后 ${formatHours(Math.abs(gapHours))}` : `领先 ${formatHours(gapHours)}`}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
               </div>
+              
+              {/* 智能配速分析（带引导线）*/}
+              {activePlan.deadline && (() => {
+                const today = new Date()
+                today.setHours(0, 0, 0, 0)
+                const deadlineDate = new Date(activePlan.deadline)
+                deadlineDate.setHours(0, 0, 0, 0)
+                
+                if (today <= deadlineDate) {
+                  const planStartDate = new Date(activePlan.created_at.split(' ')[0])
+                  planStartDate.setHours(0, 0, 0, 0)
+                  const totalDays = Math.ceil((deadlineDate.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24))
+                  const elapsedDays = Math.ceil((today.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24))
+                  const remainingDays = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                  const paceProgress = Math.min((elapsedDays / totalDays) * 100, 100)
+                  
+                  // 配速员应完成的进度
+                  const paceExpectedHours = activePlan.initial_hours * (elapsedDays / totalDays)
+                  // 实际已完成的时间
+                  const actualSpentHours = totalSpent
+                  // 差距
+                  const gapHours = actualSpentHours - paceExpectedHours
+                  // 剩余需完成时间
+                  const remainingHours = activePlan.initial_hours - actualSpentHours
+                  
+                  // 判断是落后还是领先
+                  const isBehind = gapHours < 0
+                  
+                  // 根据状态设置颜色
+                  const guideColor = isBehind ? 'border-orange-400' : 'border-green-400'
+                  
+                  if (isBehind) {
+                    // 落后情况
+                    const behindHours = Math.abs(gapHours)
+                    const currentSpeed = actualSpentHours / elapsedDays
+                    const minSpeedPerDay = remainingHours / remainingDays
+                    const paceSpeed = activePlan.initial_hours / totalDays
+                    
+                    // 计算合理的建议速度（不超过12小时/天）
+                    const SAFE_SPEED_LIMIT = 12.0 // 安全上限：12小时/天
+                    const speedGap = paceSpeed - currentSpeed
+                    
+                    // 稳健方案：适度提速
+                    let conservativeSpeed = Math.min(
+                      currentSpeed + speedGap * 1.5, // 缩小差距的1.5倍
+                      minSpeedPerDay * 1.1, // 最低速度的1.1倍
+                      8.0 // 稳健上限：8小时/天
+                    )
+                    conservativeSpeed = Math.max(conservativeSpeed, minSpeedPerDay)
+                    
+                    // 积极方案：显著提速
+                    let aggressiveSpeed = Math.min(
+                      currentSpeed + speedGap * 2.5, // 缩小差距的2.5倍
+                      paceSpeed * 2.0, // 或配速员速度的2倍
+                      SAFE_SPEED_LIMIT // 但不超过12小时/天
+                    )
+                    aggressiveSpeed = Math.max(aggressiveSpeed, minSpeedPerDay)
+                    
+                    // 计算时间的辅助函数
+                    const formatCatchUpTime = (days: number) => {
+                      const exactDays = Math.ceil(days)
+                      if (days <= 7) return `${exactDays} 天`
+                      if (days <= 21) return `${Math.ceil(days / 7)} 周`
+                      if (days <= 60) return `${Math.ceil(days / 30)} 个月`
+                      return `较长时间 (约 ${exactDays} 天)`
+                    }
+                    
+                    // 计算稳健方案的追赶时间
+                    const conservativeCatchUpSpeed = conservativeSpeed - paceSpeed
+                    const conservativeDays = conservativeCatchUpSpeed > 0 ? behindHours / conservativeCatchUpSpeed : Infinity
+                    
+                    // 计算积极方案的追赶时间
+                    const aggressiveCatchUpSpeed = aggressiveSpeed - paceSpeed
+                    const aggressiveDays = aggressiveCatchUpSpeed > 0 ? behindHours / aggressiveCatchUpSpeed : Infinity
+                    
+                    // 判断是否显示建议：最低速度不能超过安全上限
+                    const canShowSuggestions = minSpeedPerDay <= SAFE_SPEED_LIMIT
+                    const shouldShowConservative = canShowSuggestions && 
+                                                   conservativeCatchUpSpeed > 0 && 
+                                                   conservativeDays < remainingDays
+                    const shouldShowAggressive = canShowSuggestions && 
+                                                 aggressiveCatchUpSpeed > 0 && 
+                                                 aggressiveDays < remainingDays &&
+                                                 aggressiveSpeed > conservativeSpeed + 0.5 // 两种方案速度差异显著时才显示
+                    
+                    return (
+                      <div className="mt-0 p-3 bg-gradient-to-br from-orange-50 via-orange-50 to-red-50 border border-orange-200 rounded-xl shadow-sm">
+                          {/* 标题行 */}
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center shadow-sm">
+                              <span className="text-sm">🐰</span>
+                            </div>
+                            <span className="text-xs font-bold text-orange-900">配速员分析</span>
+                          </div>
+                          <span className="text-xs text-orange-600 font-medium">
+                            {elapsedDays}/{totalDays}天 · 剩{remainingDays}天
+                          </span>
+                        </div>
+                        
+                        {/* 数据行 - 2列紧凑布局 */}
+                        <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+                          <div className="flex items-center justify-between px-2 py-1.5 bg-white rounded-lg border border-orange-100 shadow-sm">
+                            <span className="text-orange-700 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                              </svg>
+                              落后
+                            </span>
+                            <span className="font-bold text-orange-600">{formatHours(behindHours)}</span>
+                          </div>
+                          <div className="flex items-center justify-between px-2 py-1.5 bg-white rounded-lg border border-orange-100 shadow-sm">
+                            <span className="text-orange-700 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                              </svg>
+                              速度
+                            </span>
+                            <span className="font-bold text-orange-600">{currentSpeed.toFixed(2)} hr/天</span>
+                          </div>
+                        </div>
+                        
+                        {/* 建议区域 */}
+                        <div className="space-y-1.5">
+                          {shouldShowConservative && (
+                            <div className="text-xs text-orange-800 px-3 py-2 bg-gradient-to-r from-orange-100 to-orange-50 rounded-lg border border-orange-200 flex items-start gap-2 shadow-sm">
+                              <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                              <span className="leading-relaxed">
+                                <span className="font-bold text-orange-900">稳健方案：</span>保持 <span className="font-bold text-orange-900">{conservativeSpeed.toFixed(2)} hr/天</span>，约 <span className="font-bold text-orange-900">{formatCatchUpTime(conservativeDays)}</span> 可追上兔子
+                              </span>
+                            </div>
+                          )}
+                          
+                          {shouldShowAggressive && (
+                            <div className="text-xs text-orange-800 px-3 py-2 bg-gradient-to-r from-orange-100 to-orange-50 rounded-lg border border-orange-200 flex items-start gap-2 shadow-sm">
+                              <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                              </svg>
+                              <span className="leading-relaxed">
+                                <span className="font-bold text-orange-900">积极方案：</span>保持 <span className="font-bold text-orange-900">{aggressiveSpeed.toFixed(2)} hr/天</span>，约 <span className="font-bold text-orange-900">{formatCatchUpTime(aggressiveDays)}</span> 可追上兔子
+                              </span>
+                            </div>
+                          )}
+                          
+                          {minSpeedPerDay > SAFE_SPEED_LIMIT && (
+                            <div className="text-xs text-red-800 px-3 py-2 bg-gradient-to-r from-red-100 to-red-50 rounded-lg border border-red-200 flex items-start gap-2 shadow-sm">
+                              <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                              </svg>
+                              <span className="leading-relaxed font-medium">
+                                当前进度严重落后，建议调整计划截止日期
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  } else {
+                    // 领先情况
+                    const aheadHours = gapHours
+                    const currentSpeed = actualSpentHours / elapsedDays
+                    const estimatedDaysToFinish = remainingHours / currentSpeed
+                    const canFinishEarlyDays = Math.max(0, remainingDays - estimatedDaysToFinish)
+                    
+                    return (
+                      <div className="mt-0 p-3 bg-gradient-to-br from-green-50 via-emerald-50 to-green-50 border border-green-200 rounded-xl shadow-sm">
+                          {/* 标题行 */}
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg flex items-center justify-center shadow-sm">
+                              <span className="text-sm">🐰</span>
+                            </div>
+                            <span className="text-xs font-bold text-green-900">配速员分析</span>
+                          </div>
+                          <span className="text-xs text-green-600 font-medium">
+                            {elapsedDays}/{totalDays}天 · 剩{remainingDays}天
+                          </span>
+                        </div>
+                        
+                        {/* 数据行 - 紧凑布局 */}
+                        <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+                          <div className="flex items-center justify-between px-2 py-1.5 bg-white rounded-lg border border-green-100 shadow-sm">
+                            <span className="text-green-700 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              领先
+                            </span>
+                            <span className="font-bold text-green-600">{formatHours(aheadHours)}</span>
+                          </div>
+                          <div className="flex items-center justify-between px-2 py-1.5 bg-white rounded-lg border border-green-100 shadow-sm">
+                            <span className="text-green-700 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                              </svg>
+                              速度
+                            </span>
+                            <span className="font-bold text-green-600">{currentSpeed.toFixed(2)} hr/天</span>
+                          </div>
+                        </div>
+                        
+                        {/* 提示行 */}
+                        <div className="text-xs text-green-800 px-3 py-2 bg-gradient-to-r from-green-100 to-emerald-50 rounded-lg border border-green-200 flex items-start gap-2 shadow-sm">
+                          <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="leading-relaxed">
+                            保持当前速度，可提前约 <span className="font-bold text-green-900">{Math.round(canFinishEarlyDays)} 天</span> 完成！继续加油！
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  }
+                }
+                return null
+              })()}
             </div>
           </>
         )}
@@ -261,8 +584,10 @@ export default function Dashboard({ activePlan }: DashboardProps) {
                 className="bg-gradient-to-br from-orange-50 to-red-50 border-2 border-orange-200 rounded-xl shadow-sm p-6 cursor-pointer hover:shadow-lg hover:border-orange-300 transition-all"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-orange-700 text-sm font-medium">昨日专注</span>
-                  <span className="text-2xl">⚠️</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">⚠️</span>
+                    <span className="text-orange-800 text-base font-bold tracking-wide">昨日专注</span>
+                  </div>
                 </div>
                 <div className="text-3xl font-bold text-orange-600 mb-2">-:--</div>
                 <div className="text-xs text-orange-600 flex items-center gap-1">
@@ -283,8 +608,10 @@ export default function Dashboard({ activePlan }: DashboardProps) {
                 className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl shadow-sm p-6 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-blue-700 text-sm font-medium">昨日专注</span>
-                  <span className="text-2xl">📅</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">📅</span>
+                    <span className="text-blue-800 text-base font-bold tracking-wide">昨日专注</span>
+                  </div>
                 </div>
                 <div className="flex items-baseline gap-1.5 mb-2">
                   <span className="text-3xl font-bold text-emerald-600">
@@ -318,8 +645,10 @@ export default function Dashboard({ activePlan }: DashboardProps) {
               className="bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-xl shadow-sm p-6 cursor-pointer hover:shadow-lg hover:border-emerald-300 transition-all"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-emerald-700 text-sm font-medium">昨日专注</span>
-                <span className="text-2xl">✅</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">✅</span>
+                  <span className="text-emerald-800 text-base font-bold tracking-wide">昨日专注</span>
+                </div>
               </div>
               <div className="flex items-baseline gap-1.5 mb-2">
                 <span className="text-3xl font-bold text-emerald-600">
@@ -348,10 +677,10 @@ export default function Dashboard({ activePlan }: DashboardProps) {
         <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow flex flex-col">
           <div 
             onClick={() => navigate('/tasks')} 
-            className="flex items-center justify-between mb-3 cursor-pointer"
+            className="flex items-center gap-2 mb-3 cursor-pointer"
           >
-            <span className="text-gray-600 text-sm">今日已完成</span>
             <span className="text-2xl">✅</span>
+            <span className="text-gray-800 text-base font-bold tracking-wide">今日已完成</span>
           </div>
           <div className="flex-1 flex flex-col min-h-[96px]">
             <div className="space-y-2 flex-1">
@@ -390,10 +719,10 @@ export default function Dashboard({ activePlan }: DashboardProps) {
         <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow flex flex-col">
           <div 
             onClick={() => navigate('/tasks')} 
-            className="flex items-center justify-between mb-3 cursor-pointer"
+            className="flex items-center gap-2 mb-3 cursor-pointer"
           >
-            <span className="text-gray-600 text-sm">任务池</span>
             <span className="text-2xl">🎯</span>
+            <span className="text-gray-800 text-base font-bold tracking-wide">任务池</span>
           </div>
             <div className="flex-1 flex flex-col min-h-[96px]">
               <div className="space-y-2 flex-1">

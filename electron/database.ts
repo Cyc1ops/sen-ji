@@ -7,6 +7,7 @@ export interface Plan {
   current_hours: number
   status: 'active' | 'archived'
   archive_reason?: 'completed' | 'suspended'  // 归档原因：已完成 或 已搁置
+  deadline?: string | null  // 挑战截止日期 YYYY-MM-DD
   created_at: string
   archived_at: string | null
 }
@@ -65,6 +66,13 @@ export function initDatabase(db: Database.Database) {
   // 数据库迁移：为 plans 表添加 archive_reason 字段
   try {
     db.exec(`ALTER TABLE plans ADD COLUMN archive_reason TEXT`)
+  } catch (error) {
+    // 字段已存在，忽略错误
+  }
+
+  // 数据库迁移：为 plans 表添加 deadline 字段
+  try {
+    db.exec(`ALTER TABLE plans ADD COLUMN deadline TEXT`)
   } catch (error) {
     // 字段已存在，忽略错误
   }
@@ -153,12 +161,12 @@ export function getActivePlan(db: Database.Database): Plan | null {
   return plan
 }
 
-export function createPlan(db: Database.Database, name: string, initialHours: number): Plan {
+export function createPlan(db: Database.Database, name: string, initialHours: number, deadline?: string | null): Plan {
   const stmt = db.prepare(`
-    INSERT INTO plans (name, initial_hours, current_hours, status, is_current)
-    VALUES (?, ?, ?, 'active', 1)
+    INSERT INTO plans (name, initial_hours, current_hours, status, is_current, deadline)
+    VALUES (?, ?, ?, 'active', 1, ?)
   `)
-  const result = stmt.run(name, initialHours, initialHours)
+  const result = stmt.run(name, initialHours, initialHours, deadline || null)
   
   // 将其他所有计划的 is_current 设为 0
   db.prepare('UPDATE plans SET is_current = 0 WHERE id != ?').run(result.lastInsertRowid)
@@ -182,6 +190,10 @@ export function updatePlan(db: Database.Database, id: number, updates: Partial<P
   if (updates.status !== undefined) {
     fields.push('status = ?')
     values.push(updates.status)
+  }
+  if (updates.deadline !== undefined) {
+    fields.push('deadline = ?')
+    values.push(updates.deadline)
   }
 
   values.push(id)
@@ -750,5 +762,74 @@ function formatHours(hours: number): string {
   const h = Math.floor(hours)
   const m = Math.round((hours - h) * 60)
   return `${h}:${m.toString().padStart(2, '0')}`
+}
+
+// 创建测试数据
+export function createTestData(db: Database.Database): Plan {
+  // 检查是否已有测试计划
+  const existingPlan = db.prepare('SELECT * FROM plans WHERE name = ?').get('测试计划 Alpha')
+  
+  if (existingPlan) {
+    return existingPlan as Plan
+  }
+
+  // 创建新的测试计划（30天前创建，一年后截止）
+  const oneYearLater = new Date()
+  oneYearLater.setFullYear(oneYearLater.getFullYear() + 1)
+  const deadline = oneYearLater.toISOString().split('T')[0]
+  
+  const stmt = db.prepare(`
+    INSERT INTO plans (name, initial_hours, current_hours, status, is_current, deadline, created_at)
+    VALUES (?, ?, ?, 'active', 0, ?, datetime('now', '-30 days', 'localtime'))
+  `)
+  
+  const result = stmt.run('测试计划 Alpha', 1000, 1000, deadline)
+  const planId = result.lastInsertRowid as number
+  
+  // 创建测试任务
+  const tasks = [
+    { name: '深度学习基础', reward_hours: 10 },
+    { name: '项目实战练习', reward_hours: 15 },
+    { name: '代码重构', reward_hours: 8 },
+    { name: '技术文档编写', reward_hours: 5 },
+    { name: '算法训练', reward_hours: 12 }
+  ]
+  
+  const taskStmt = db.prepare(`
+    INSERT INTO reward_tasks (plan_id, name, reward_hours, is_active, created_at)
+    VALUES (?, ?, ?, 1, datetime('now', 'localtime'))
+  `)
+  
+  tasks.forEach(task => {
+    taskStmt.run(planId, task.name, task.reward_hours)
+  })
+  
+  // 创建过去30天的历史记录
+  const recordStmt = db.prepare(`
+    INSERT INTO daily_records (plan_id, date, focus_hours, remaining_hours, is_confirmed, created_at)
+    VALUES (?, ?, ?, ?, 1, datetime('now', 'localtime'))
+  `)
+  
+  const today = new Date()
+  let remainingHours = 1000 // 从初始1000小时开始
+  
+  for (let i = 30; i > 0; i--) {
+    const date = new Date(today)
+    date.setDate(date.getDate() - i)
+    const dateStr = date.toISOString().split('T')[0]
+    
+    // 随机生成专注时间 (0-10小时)
+    const focusHours = Math.random() * 10
+    remainingHours -= focusHours // 递减剩余时间
+    
+    recordStmt.run(planId, dateStr, focusHours, remainingHours)
+  }
+  
+  // 更新计划的剩余时间
+  db.prepare('UPDATE plans SET current_hours = ? WHERE id = ?').run(remainingHours, planId)
+  
+  // 返回创建的计划
+  const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(planId) as Plan
+  return plan
 }
 

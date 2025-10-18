@@ -263,6 +263,27 @@ export const mockElectronAPI: ElectronAPI = {
     // Mock implementation
   },
 
+  // 测试数据
+  createTestData: async () => {
+    const oneYearLater = new Date()
+    oneYearLater.setFullYear(oneYearLater.getFullYear() + 1)
+    const deadline = oneYearLater.toISOString().split('T')[0]
+    
+    const testPlan: Plan = {
+      id: Date.now(),
+      name: '测试计划 Alpha',
+      initial_hours: 1000,
+      current_hours: 1000,
+      status: 'active',
+      deadline,
+      created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      archived_at: null
+    }
+    
+    mockStorage.plans.push(testPlan)
+    return testPlan
+  },
+
   // Export functions
   exportToMarkdown: async (planId: number) => {
     const plan = mockStorage.plans.find(p => p.id === planId)

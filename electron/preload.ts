@@ -4,8 +4,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 计划管理
   getAllPlans: () => ipcRenderer.invoke('get-all-plans'),
   getActivePlan: () => ipcRenderer.invoke('get-active-plan'),
-  createPlan: (name: string, initialHours: number) => 
-    ipcRenderer.invoke('create-plan', name, initialHours),
+  createPlan: (name: string, initialHours: number, deadline?: string | null) => 
+    ipcRenderer.invoke('create-plan', name, initialHours, deadline),
   updatePlan: (id: number, updates: any) => 
     ipcRenderer.invoke('update-plan', id, updates),
   setActivePlan: (id: number) => 
@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('update-plan-details', id, initialHours, createdAt),
   recalculateAllRecords: (planId: number) =>
     ipcRenderer.invoke('recalculate-all-records', planId),
+  
+  // 测试数据
+  createTestData: () =>
+    ipcRenderer.invoke('create-test-data'),
 
   // 奖励任务
   getRewardTasks: (planId: number) => 
