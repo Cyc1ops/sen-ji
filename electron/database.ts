@@ -1,45 +1,8 @@
 import Database from 'better-sqlite3'
+import type { Plan, RewardTask, DailyRecord, CompletedTask } from '../src/types'
 
-export interface Plan {
-  id: number
-  name: string
-  initial_hours: number
-  current_hours: number
-  status: 'active' | 'archived'
-  archive_reason?: 'completed' | 'suspended'  // 归档原因：已完成 或 已搁置
-  deadline?: string | null  // 挑战截止日期 YYYY-MM-DD
-  created_at: string
-  archived_at: string | null
-}
-
-export interface RewardTask {
-  id: number
-  plan_id: number
-  name: string
-  reward_hours: number
-  is_active: number
-  created_at: string
-}
-
-export interface DailyRecord {
-  id: number
-  plan_id: number
-  date: string
-  focus_hours: number
-  remaining_hours: number
-  created_at: string
-  is_confirmed: number  // 是否已确认（0=未确认，1=已确认无专注或已记录）
-  completed_tasks?: CompletedTask[]
-}
-
-export interface CompletedTask {
-  id: number
-  daily_record_id: number
-  reward_task_id: number
-  reward_task_name: string
-  reward_hours: number
-  completed_at: string
-}
+// 重新导出类型供其他electron模块使用
+export type { Plan, RewardTask, DailyRecord, CompletedTask }
 
 export function initDatabase(db: Database.Database) {
   // 创建计划表
