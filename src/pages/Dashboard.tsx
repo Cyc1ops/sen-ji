@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Plan, DailyRecord, RewardTask } from '../types'
-import { formatHours, getTodayDate, getYesterdayDate } from '../utils/helpers'
+import { formatHours, getTodayDate, getYesterdayDate, addDays } from '../utils/helpers'
 import {
   SAFE_SPEED_LIMIT,
   CONSERVATIVE_SPEED_LIMIT,
@@ -117,9 +117,7 @@ export default function Dashboard({ activePlan }: DashboardProps) {
 
     // 计算过去N天的日期范围
     const endDate = getTodayDate()
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - DEFAULT_HEATMAP_DAYS)
-    const startDateStr = startDate.toISOString().split('T')[0]
+    const startDateStr = addDays(-DEFAULT_HEATMAP_DAYS)
 
     // 加载数据
     const records = await window.electronAPI.getRecordsByDateRange(

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Plan, DailyRecord } from '../types'
-import { formatHours, formatDate, parseHours } from '../utils/helpers'
+import { formatHours, formatDate, parseHours, generateCalendarDays } from '../utils/helpers'
 import TimeInput from '../components/TimeInput'
 
 interface HistoryProps {
@@ -268,20 +268,12 @@ function CalendarView({ records, onSelectRecord, activePlan, onRecordsUpdate }: 
   const [backfillFocusHours, setBackfillFocusHours] = useState('0:00')
 
   const recordMap = new Map(records.map((r) => [r.date, r]))
-
+  
   const year = currentMonth.getFullYear()
   const month = currentMonth.getMonth()
-
-  const firstDay = new Date(year, month, 1)
-  const startDate = new Date(firstDay)
-  startDate.setDate(startDate.getDate() - startDate.getDay())
-
-  const days: Date[] = []
-  const current = new Date(startDate)
-  while (days.length < 42) {
-    days.push(new Date(current))
-    current.setDate(current.getDate() + 1)
-  }
+  
+  // 生成日历数组（6周 * 7天 = 42天）
+  const days = generateCalendarDays(currentMonth)
 
   const prevMonth = () => {
     setCurrentMonth(new Date(year, month - 1))
