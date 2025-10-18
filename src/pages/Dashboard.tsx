@@ -148,33 +148,15 @@ export default function Dashboard({ activePlan }: DashboardProps) {
     }
   }, [loadData])
 
-  if (!activePlan) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🌲</div>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">欢迎使用森记</h2>
-          <p className="text-gray-600 mb-6">开始你的时间统计之旅</p>
-          <a
-            href="/settings"
-            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            创建第一个计划
-          </a>
-        </div>
-      </div>
-    )
-  }
-
-  // 使用 useMemo 缓存计算结果
+  // 使用 useMemo 缓存计算结果（必须在所有条件判断之前调用 Hooks）
   const progress = useMemo(
-    () => ((activePlan.initial_hours - activePlan.current_hours) / activePlan.initial_hours) * 100,
-    [activePlan.initial_hours, activePlan.current_hours]
+    () => activePlan ? ((activePlan.initial_hours - activePlan.current_hours) / activePlan.initial_hours) * 100 : 0,
+    [activePlan]
   )
   
   const totalSpent = useMemo(
-    () => activePlan.initial_hours - activePlan.current_hours,
-    [activePlan.initial_hours, activePlan.current_hours]
+    () => activePlan ? activePlan.initial_hours - activePlan.current_hours : 0,
+    [activePlan]
   )
 
   // 今日总激励时间
@@ -200,6 +182,24 @@ export default function Dashboard({ activePlan }: DashboardProps) {
     () => allTasks.filter(task => !todayCompletedTaskIds.has(task.id)),
     [allTasks, todayCompletedTaskIds]
   )
+
+  if (!activePlan) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🌲</div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">欢迎使用森记</h2>
+          <p className="text-gray-600 mb-6">开始你的时间统计之旅</p>
+          <a
+            href="/settings"
+            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            创建第一个计划
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
