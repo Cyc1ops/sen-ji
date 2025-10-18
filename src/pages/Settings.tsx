@@ -622,7 +622,7 @@ export default function Settings({ onPlanChange }: SettingsProps) {
       <section>
         <h2 className="text-xl font-semibold text-gray-900 mb-4">关于</h2>
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">森记 v1.0.0</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">森记 v1.1.1</h3>
           <p className="text-gray-600 mb-4">
             一款简约高效的时间统计应用，帮助你完成森林时间挑战。
           </p>

@@ -1,7 +1,7 @@
 {
   "name": "forest-timer",
   "productName": "森记",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "森林时间统计应用",
   "main": "dist-electron/main.js",
   "scripts": {
