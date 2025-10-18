@@ -6,6 +6,7 @@ import Records from './pages/Records'
 import History from './pages/History'
 import Settings from './pages/Settings'
 import { Plan } from './types'
+import { formatHours } from './utils/helpers'
 
 function App() {
   const [activePlan, setActivePlan] = useState<Plan | null>(null)
@@ -88,13 +89,6 @@ function NavItem({ to, icon, label }: { to: string; icon: string; label: string 
       {label}
     </NavLink>
   )
-}
-
-function formatHours(hours: number): string {
-  const h = Math.floor(Math.abs(hours))
-  const m = Math.round((Math.abs(hours) - h) * 60)
-  const sign = hours < 0 ? '-' : ''
-  return `${sign}${h}:${m.toString().padStart(2, '0')}`
 }
 
 export default App

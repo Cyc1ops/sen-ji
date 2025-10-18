@@ -3,6 +3,14 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Plan, DailyRecord, RewardTask } from '../types'
 import { formatHours, getTodayDate, getYesterdayDate } from '../utils/helpers'
+import {
+  SAFE_SPEED_LIMIT,
+  CONSERVATIVE_SPEED_LIMIT,
+  MIN_SPEED_DIFFERENCE,
+  DEFAULT_HEATMAP_DAYS,
+  STORAGE_KEY_DASHBOARD_VIEW,
+  STORAGE_KEY_DEFAULT_DASHBOARD_VIEW
+} from '../constants'
 
 interface DashboardProps {
   activePlan: Plan | null
@@ -16,9 +24,9 @@ export default function Dashboard({ activePlan }: DashboardProps) {
   const [allTasks, setAllTasks] = useState<RewardTask[]>([])
   const [progressViewMode, setProgressViewMode] = useState<'stats' | 'heatmap'>(() => {
     // 从 localStorage 读取用户上次选择的视图，如果没有则使用默认设置
-    const saved = localStorage.getItem('dashboardViewMode')
+    const saved = localStorage.getItem(STORAGE_KEY_DASHBOARD_VIEW)
     if (saved) return saved as 'stats' | 'heatmap'
-    const defaultView = localStorage.getItem('defaultDashboardView')
+    const defaultView = localStorage.getItem(STORAGE_KEY_DEFAULT_DASHBOARD_VIEW)
     return (defaultView as 'stats' | 'heatmap') || 'stats'
   })
   const [heatmapRecords, setHeatmapRecords] = useState<DailyRecord[]>([])
@@ -35,7 +43,7 @@ export default function Dashboard({ activePlan }: DashboardProps) {
 
   // 保存视图模式到 localStorage
   useEffect(() => {
-    localStorage.setItem('dashboardViewMode', progressViewMode)
+    localStorage.setItem(STORAGE_KEY_DASHBOARD_VIEW, progressViewMode)
   }, [progressViewMode])
 
   const loadData = async () => {
@@ -107,13 +115,11 @@ export default function Dashboard({ activePlan }: DashboardProps) {
   const loadHeatmapData = async () => {
     if (!activePlan) return
 
-    // 计算过去90天的日期范围
+    // 计算过去N天的日期范围
     const endDate = getTodayDate()
     const startDate = new Date()
-    startDate.setDate(startDate.getDate() - 90)
+    startDate.setDate(startDate.getDate() - DEFAULT_HEATMAP_DAYS)
     const startDateStr = startDate.toISOString().split('T')[0]
-
-    console.log('Loading heatmap data from', startDateStr, 'to', endDate)
 
     // 加载数据
     const records = await window.electronAPI.getRecordsByDateRange(
@@ -121,7 +127,6 @@ export default function Dashboard({ activePlan }: DashboardProps) {
       startDateStr,
       endDate
     )
-    console.log('Heatmap records loaded:', records.length, 'records')
     setHeatmapRecords(records)
   }
 
@@ -190,7 +195,6 @@ export default function Dashboard({ activePlan }: DashboardProps) {
           <button
             onClick={() => {
               const newMode = progressViewMode === 'stats' ? 'heatmap' : 'stats'
-              console.log('Switching view mode to:', newMode, 'heatmapRecords count:', heatmapRecords.length)
               setProgressViewMode(newMode)
             }}
             className="p-2 text-gray-600 hover:bg-white hover:shadow-sm rounded-lg transition-all"
@@ -368,15 +372,14 @@ export default function Dashboard({ activePlan }: DashboardProps) {
                     const minSpeedPerDay = remainingHours / remainingDays
                     const paceSpeed = activePlan.initial_hours / totalDays
                     
-                    // 计算合理的建议速度（不超过12小时/天）
-                    const SAFE_SPEED_LIMIT = 12.0 // 安全上限：12小时/天
+                    // 计算合理的建议速度
                     const speedGap = paceSpeed - currentSpeed
                     
                     // 稳健方案：适度提速
                     let conservativeSpeed = Math.min(
                       currentSpeed + speedGap * 1.5, // 缩小差距的1.5倍
                       minSpeedPerDay * 1.1, // 最低速度的1.1倍
-                      8.0 // 稳健上限：8小时/天
+                      CONSERVATIVE_SPEED_LIMIT // 稳健上限
                     )
                     conservativeSpeed = Math.max(conservativeSpeed, minSpeedPerDay)
                     
@@ -413,7 +416,7 @@ export default function Dashboard({ activePlan }: DashboardProps) {
                     const shouldShowAggressive = canShowSuggestions && 
                                                  aggressiveCatchUpSpeed > 0 && 
                                                  aggressiveDays < remainingDays &&
-                                                 aggressiveSpeed > conservativeSpeed + 0.5 // 两种方案速度差异显著时才显示
+                                                 aggressiveSpeed > conservativeSpeed + MIN_SPEED_DIFFERENCE // 两种方案速度差异显著时才显示
                     
                     return (
                       <div className="mt-0 p-3 bg-gradient-to-br from-orange-50 via-orange-50 to-red-50 border border-orange-200 rounded-xl shadow-sm">
@@ -555,7 +558,6 @@ export default function Dashboard({ activePlan }: DashboardProps) {
         {/* 热力图视图 */}
         {progressViewMode === 'heatmap' && (
           <>
-            {console.log('Rendering HeatmapView with', heatmapRecords.length, 'records')}
             <HeatmapView 
               records={heatmapRecords} 
               plan={activePlan}
@@ -840,14 +842,12 @@ function HeatmapView({ records, plan }: HeatmapViewProps) {
   const [hoveredDate, setHoveredDate] = useState<string | null>(null)
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number; containerY: number; cellRight?: number } | null>(null)
 
-  console.log('HeatmapView rendered, hoveredDate:', hoveredDate, 'hoverPosition:', hoverPosition)
-
   // 创建日期到记录的映射
   const recordMap = new Map(records.map((r) => [r.date, r]))
 
-  // 获取过去90天的日期
+  // 获取过去N天的日期
   const days: Date[] = []
-  for (let i = 89; i >= 0; i--) {
+  for (let i = DEFAULT_HEATMAP_DAYS - 1; i >= 0; i--) {
     const date = new Date()
     date.setDate(date.getDate() - i)
     days.push(date)
@@ -900,7 +900,6 @@ function HeatmapView({ records, plan }: HeatmapViewProps) {
   }
 
   const handleCellLeave = () => {
-    console.log('Hover leave')
     setHoveredDate(null)
     setHoverPosition(null)
   }
@@ -918,7 +917,7 @@ function HeatmapView({ records, plan }: HeatmapViewProps) {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-gray-600">初始时间: {formatHours(plan.initial_hours)}</p>
-          <p className="text-xs text-gray-500 mt-1">过去90天的总森林时间热力图</p>
+          <p className="text-xs text-gray-500 mt-1">过去{DEFAULT_HEATMAP_DAYS}天的总森林时间热力图</p>
         </div>
         <div className="text-right">
           <div className="text-3xl font-bold text-blue-600">
@@ -968,11 +967,9 @@ function HeatmapView({ records, plan }: HeatmapViewProps) {
                       hoveredDate === dateStr ? 'opacity-70' : 'hover:opacity-80'
                     }`}
                       onMouseEnter={(e) => {
-                        console.log('Mouse enter on cell:', dateStr)
                         handleCellHover(dateStr, e)
                       }}
                       onMouseLeave={() => {
-                        console.log('Mouse leave cell')
                         handleCellLeave()
                       }}
                       onClick={() => handleCellClick(dateStr)}

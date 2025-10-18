@@ -64,7 +64,6 @@ export default function Records({ activePlan }: RecordsProps) {
       // 刷新页面
       window.location.reload()
     } catch (error) {
-      console.error(error)
       alert('保存失败，请重试')
     }
   }
